@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>저축 시뮬레이터</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --border: #e2e5ea;
+      --text: #1a1d23;
+      --text-secondary: #5c6370;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --interest: #059669;
+      --interest-light: #ecfdf5;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 32px 20px 48px;
+    }
+
+    header {
+      margin-bottom: 28px;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    header p {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .panel-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+
+    .inputs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    @media (max-width: 640px) {
+      .inputs { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    .field {
+      min-width: 0;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .field .input-wrap {
+      display: flex;
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .field input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 9px 12px;
+      font-size: 1rem;
+      font-family: inherit;
+      color: var(--text);
+      min-width: 0;
+    }
+
+    .field input:focus {
+      outline: none;
+    }
+
+    .field .input-wrap:focus-within {
+      border-color: var(--accent);
+      background: var(--surface);
+    }
+
+    .field .unit {
+      flex-shrink: 0;
+      padding: 0 10px;
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      border-left: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .field-hint {
+      margin-top: 5px;
+      font-size: 0.75rem;
+      color: var(--accent);
+      min-height: 1.125rem;
+      word-break: keep-all;
+    }
+
+    .field-hint:empty {
+      display: none;
+    }
+
+    .notice {
+      margin-top: 12px;
+      font-size: 0.8125rem;
+      color: #b45309;
+      display: none;
+    }
+
+    .notice.visible { display: block; }
+
+    .results {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 640px) {
+      .results { grid-template-columns: 1fr; }
+    }
+
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 16px;
+    }
+
+    .result-card.highlight {
+      border-color: var(--accent);
+      background: var(--accent-light);
+    }
+
+    .result-card .period {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .result-card.highlight .period {
+      color: var(--accent);
+    }
+
+    .result-card .amount {
+      font-size: 1.375rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      word-break: break-all;
+    }
+
+    .result-card .meta {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .result-card .meta .interest {
+      color: var(--interest);
+      font-weight: 500;
+    }
+
+    .chart-wrap {
+      position: relative;
+      margin-bottom: 8px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 260px;
+    }
+
+    .chart-caption {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8125rem;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 10px 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+      font-size: 0.75rem;
+    }
+
+    thead th:not(:first-child) {
+      text-align: right;
+    }
+
+    tbody td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody td:not(:first-child) {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover {
+      background: var(--bg);
+    }
+
+    tbody td.interest-cell {
+      color: var(--interest);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>저축 시뮬레이터</h1>
+      <p>매월 말 납입 · 저축 기간 이후 납입 중단 · 저축 종료 시 퇴직금 일시 반영 · 퇴직 후 매월 생활비 차감 · 월복리 가정 · 세금·인플레 미반영</p>
+    </header>
+
+    <section class="panel">
+      <div class="panel-title">입력</div>
+      <div class="inputs">
+        <div class="field">
+          <label for="monthly">월 저축액</label>
+          <div class="input-wrap">
+            <input type="number" id="monthly" value="50" min="0" step="1">
+            <span class="unit">만원</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="contributionYears">저축 기간</label>
+          <div class="input-wrap">
+            <input type="number" id="contributionYears" value="10" min="0" max="10" step="1">
+            <span class="unit">년</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="initial">초기 자산</label>
+          <div class="input-wrap">
+            <input type="number" id="initial" value="0" min="0" step="1">
+            <span class="unit">만원</span>
+          </div>
+          <p class="field-hint" id="initial-hint" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="rate">연 수익률</label>
+          <div class="input-wrap">
+            <input type="number" id="rate" value="7" min="0" max="100" step="1">
+            <span class="unit">%</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="severance">퇴직금</label>
+          <div class="input-wrap">
+            <input type="number" id="severance" value="0" min="0" step="1">
+            <span class="unit">만원</span>
+          </div>
+          <p class="field-hint" id="severance-hint" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="livingExpense">퇴직 후 생활비</label>
+          <div class="input-wrap">
+            <input type="number" id="livingExpense" value="0" min="0" step="1">
+            <span class="unit">만원</span>
+          </div>
+        </div>
+      </div>
+      <p class="notice" id="notice"></p>
+    </section>
+
+    <div class="results" id="results"></div>
+
+    <section class="panel">
+      <div class="panel-title">자산 성장 그래프 (10년)</div>
+      <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+      </div>
+      <p class="chart-caption">X축: 1년 단위 · Y축: 총자산 10억 이하 1억, 20억 이하 2억 … 단위 · 점선: 3·5·10년 시점</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">연도별 상세</div>
+      <table>
+        <thead>
+          <tr>
+            <th>연차</th>
+            <th>연말 잔액</th>
+            <th>누적 납입</th>
+            <th>누적 저축액</th>
+            <th>누적 이자</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    const DEFAULTS = { monthlyManwon: 50, rate: 7, initialManwon: 0, contributionYears: 10, severanceManwon: 0, livingExpenseManwon: 0 };
+    const MANWON = 10000;
+    const EOK = 100000000;
+    const MAX_YEARS = 10;
+    const HORIZONS = [
+      { years: 3, months: 36, highlight: false },
+      { years: 5, months: 60, highlight: false },
+      { years: 10, months: 120, highlight: true },
+    ];
+    const REF_YEARS = [3, 5, 10];
+
+    const monthlyInput = document.getElementById('monthly');
+    const rateInput = document.getElementById('rate');
+    const initialInput = document.getElementById('initial');
+    const initialHintEl = document.getElementById('initial-hint');
+    const contributionYearsInput = document.getElementById('contributionYears');
+    const severanceInput = document.getElementById('severance');
+    const livingExpenseInput = document.getElementById('livingExpense');
+    const severanceHintEl = document.getElementById('severance-hint');
+    const noticeEl = document.getElementById('notice');
+    const resultsEl = document.getElementById('results');
+    const tableBody = document.getElementById('table-body');
+    const canvas = document.getElementById('chart');
+    const ctx = canvas.getContext('2d');
+
+    function parseInput(input, fallback) {
+      const raw = input.value.trim();
+      if (raw === '') return { value: fallback, corrected: true };
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0) return { value: fallback, corrected: true };
+      return { value: n, corrected: false };
+    }
+
+    function formatReadableManwon(manwon) {
+      if (!Number.isFinite(manwon) || manwon < 0) return '';
+      if (manwon === 0) return '0원';
+
+      const eok = Math.floor(manwon / 10000);
+      const rest = manwon % 10000;
+      let text = '';
+
+      if (eok > 0) {
+        text += eok.toLocaleString('ko-KR') + '억';
+        if (rest > 0) text += ' ';
+      }
+
+      if (rest > 0) {
+        const cheon = Math.floor(rest / 1000);
+        const rem = rest % 1000;
+        if (cheon > 0) text += cheon + '천';
+        if (rem > 0) {
+          if (cheon > 0) text += ' ';
+          text += rem.toLocaleString('ko-KR') + '만원';
+        } else {
+          text += '만원';
+        }
+      } else if (eok > 0) {
+        text += '원';
+      }
+
+      return text;
+    }
+
+    function updateManwonHint(input, hintEl) {
+      const raw = input.value.trim();
+      if (raw === '') {
+        hintEl.textContent = '';
+        return;
+      }
+      const n = Number(raw);
+      if (!Number.isFinite(n) || n < 0) {
+        hintEl.textContent = '';
+        return;
+      }
+      hintEl.textContent = '→ ' + formatReadableManwon(n);
+    }
+
+    function updateInitialHint() {
+      updateManwonHint(initialInput, initialHintEl);
+    }
+
+    function updateSeveranceHint() {
+      updateManwonHint(severanceInput, severanceHintEl);
+    }
+
+    function formatWon(n) {
+      return Math.round(n).toLocaleString('ko-KR') + '원';
+    }
+
+    function simulate(monthly, annualRate, initial, totalMonths, contributionMonths, severance, livingExpense) {
+      const monthlyRate = annualRate / 100 / 12;
+      let balance = initial;
+      const monthlyBalances = [initial];
+
+      for (let m = 1; m <= totalMonths; m++) {
+        if (contributionMonths === 0 && m === 1 && severance > 0) balance += severance;
+        balance = balance * (1 + monthlyRate);
+        if (contributionMonths > 0 && m <= contributionMonths) balance += monthly;
+        if (contributionMonths > 0 && m === contributionMonths && severance > 0) balance += severance;
+        if (m > contributionMonths && livingExpense > 0) {
+          balance -= livingExpense;
+          if (balance < 0) balance = 0;
+        }
+        monthlyBalances.push(balance);
+      }
+
+      return { balance, monthlyBalances };
+    }
+
+    function getSnapshot(monthlyBalances, months, monthly, initial, contributionMonths, severance) {
+      const balance = monthlyBalances[months];
+      const monthsContributed = Math.min(months, contributionMonths);
+      const totalSavings = monthly * monthsContributed;
+      const severanceReceived = months >= contributionMonths ? severance : 0;
+      const totalContributed = initial + totalSavings + severanceReceived;
+      const interest = balance - totalContributed;
+      return { balance, totalContributed, totalSavings, interest };
+    }
+
+    function renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, notices) {
+      const { monthlyBalances } = simulate(monthly, rate, initial, 120, contributionMonths, severance, livingExpense);
+
+      resultsEl.innerHTML = HORIZONS.map(({ years, months, highlight }) => {
+        const { balance, totalContributed, totalSavings, interest } = getSnapshot(monthlyBalances, months, monthly, initial, contributionMonths, severance);
+        return `
+          <div class="result-card${highlight ? ' highlight' : ''}">
+            <div class="period">${years}년 후</div>
+            <div class="amount">${formatWon(balance)}</div>
+            <div class="meta">
+              총 납입 ${formatWon(totalContributed)} · 누적 저축 ${formatWon(totalSavings)}<br>
+              이자 수익 <span class="interest">+${formatWon(interest)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (notices.length > 0) {
+        noticeEl.textContent = notices.join(' ');
+        noticeEl.classList.add('visible');
+      } else {
+        noticeEl.classList.remove('visible');
+      }
+
+      return monthlyBalances;
+    }
+
+    function renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances) {
+      tableBody.innerHTML = '';
+      for (let year = 1; year <= 10; year++) {
+        const months = year * 12;
+        const { balance, totalContributed, totalSavings, interest } = getSnapshot(monthlyBalances, months, monthly, initial, contributionMonths, severance);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${year}년</td>
+          <td>${formatWon(balance)}</td>
+          <td>${formatWon(totalContributed)}</td>
+          <td>${formatWon(totalSavings)}</td>
+          <td class="interest-cell">+${formatWon(interest)}</td>
+        `;
+        tableBody.appendChild(tr);
+      }
+    }
+
+    function getChartStepEok(maxEok) {
+      return Math.max(1, Math.ceil(maxEok / 10));
+    }
+
+    function drawChart(monthlyBalances) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const W = rect.width;
+      const H = rect.height;
+      const pad = { top: 16, right: 16, bottom: 36, left: 52 };
+      const plotW = W - pad.left - pad.right;
+      const plotH = H - pad.top - pad.bottom;
+
+      const totalYears = 10;
+      const data = [];
+      for (let y = 0; y <= totalYears; y++) {
+        data.push(monthlyBalances[y * 12]);
+      }
+
+      const maxEok = Math.max(Math.ceil(Math.max(...data, 0) / EOK), 1);
+      const stepEok = getChartStepEok(maxEok);
+      const axisMaxEok = Math.ceil(maxEok / stepEok) * stepEok;
+      const minVal = 0;
+      const maxVal = axisMaxEok * EOK;
+
+      const xScale = (year) => pad.left + (year / totalYears) * plotW;
+      const yScale = (val) => pad.top + plotH - ((val - minVal) / (maxVal - minVal)) * plotH;
+
+      ctx.clearRect(0, 0, W, H);
+
+      // Grid lines (총자산 규모에 따른 억원 단위)
+      ctx.strokeStyle = '#e2e5ea';
+      ctx.lineWidth = 1;
+      for (let eok = 0; eok <= axisMaxEok; eok += stepEok) {
+        const val = eok * EOK;
+        const y = yScale(val);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
+        ctx.stroke();
+
+        ctx.fillStyle = '#5c6370';
+        ctx.font = '11px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(eok + '억', pad.left - 8, y);
+      }
+
+      // X-axis labels (1년 단위)
+      ctx.fillStyle = '#5c6370';
+      ctx.font = '11px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      for (let y = 0; y <= totalYears; y++) {
+        const x = xScale(y);
+        ctx.fillText(y + '년', x, pad.top + plotH + 8);
+      }
+
+      // Reference lines at 3, 5, 10 years
+      REF_YEARS.forEach((year) => {
+        const x = xScale(year);
+        ctx.strokeStyle = '#2563eb';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(x, pad.top);
+        ctx.lineTo(x, pad.top + plotH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = '#2563eb';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(year + '년', x, pad.top - 2);
+      });
+
+      // Area fill
+      ctx.beginPath();
+      ctx.moveTo(xScale(0), yScale(data[0]));
+      for (let y = 1; y <= totalYears; y++) {
+        ctx.lineTo(xScale(y), yScale(data[y]));
+      }
+      ctx.lineTo(xScale(totalYears), yScale(minVal));
+      ctx.lineTo(xScale(0), yScale(minVal));
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(37, 99, 235, 0.08)';
+      ctx.fill();
+
+      // Line
+      ctx.beginPath();
+      ctx.moveTo(xScale(0), yScale(data[0]));
+      for (let y = 1; y <= totalYears; y++) {
+        ctx.lineTo(xScale(y), yScale(data[y]));
+      }
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // End dot
+      const lastX = xScale(totalYears);
+      const lastY = yScale(data[totalYears]);
+      ctx.beginPath();
+      ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#2563eb';
+      ctx.fill();
+    }
+
+    function recalculate() {
+      const notices = [];
+
+      const monthlyManwonParsed = parseInput(monthlyInput, DEFAULTS.monthlyManwon);
+      const rateParsed = parseInput(rateInput, DEFAULTS.rate);
+      const initialManwonParsed = parseInput(initialInput, DEFAULTS.initialManwon);
+      const severanceManwonParsed = parseInput(severanceInput, DEFAULTS.severanceManwon);
+      const livingExpenseManwonParsed = parseInput(livingExpenseInput, DEFAULTS.livingExpenseManwon);
+
+      if (monthlyManwonParsed.corrected) {
+        monthlyInput.value = monthlyManwonParsed.value;
+        notices.push('월 저축액을 기본값으로 조정했습니다.');
+      }
+      if (rateParsed.corrected) {
+        rateInput.value = rateParsed.value;
+        notices.push('연 수익률을 기본값으로 조정했습니다.');
+      }
+      if (initialManwonParsed.corrected) {
+        initialInput.value = initialManwonParsed.value;
+        notices.push('초기 자산을 기본값으로 조정했습니다.');
+      }
+      if (severanceManwonParsed.corrected) {
+        severanceInput.value = severanceManwonParsed.value;
+        notices.push('퇴직금을 기본값으로 조정했습니다.');
+      }
+      if (livingExpenseManwonParsed.corrected) {
+        livingExpenseInput.value = livingExpenseManwonParsed.value;
+        notices.push('퇴직 후 생활비를 기본값으로 조정했습니다.');
+      }
+
+      const contributionYearsParsed = parseInput(contributionYearsInput, DEFAULTS.contributionYears);
+      let contributionYears = Math.floor(contributionYearsParsed.value);
+      if (contributionYearsParsed.corrected) {
+        contributionYearsInput.value = contributionYearsParsed.value;
+        notices.push('저축 기간을 기본값으로 조정했습니다.');
+      }
+      if (contributionYears > MAX_YEARS) {
+        contributionYears = MAX_YEARS;
+        contributionYearsInput.value = MAX_YEARS;
+        notices.push('저축 기간은 최대 10년까지 설정할 수 있습니다.');
+      }
+
+      const monthly = monthlyManwonParsed.value * MANWON;
+      const rate = rateParsed.value;
+      const initial = initialManwonParsed.value * MANWON;
+      const severance = severanceManwonParsed.value * MANWON;
+      const livingExpense = livingExpenseManwonParsed.value * MANWON;
+      const contributionMonths = contributionYears * 12;
+
+      const monthlyBalances = renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, notices);
+      renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances);
+      drawChart(monthlyBalances);
+      updateInitialHint();
+      updateSeveranceHint();
+    }
+
+    [monthlyInput, rateInput, initialInput, contributionYearsInput, severanceInput, livingExpenseInput].forEach((el) => {
+      el.addEventListener('input', recalculate);
+    });
+
+    window.addEventListener('resize', () => {
+      const monthly = parseInput(monthlyInput, DEFAULTS.monthlyManwon).value * MANWON;
+      const rate = parseInput(rateInput, DEFAULTS.rate).value;
+      const initial = parseInput(initialInput, DEFAULTS.initialManwon).value * MANWON;
+      const severance = parseInput(severanceInput, DEFAULTS.severanceManwon).value * MANWON;
+      const livingExpense = parseInput(livingExpenseInput, DEFAULTS.livingExpenseManwon).value * MANWON;
+      const contributionYears = Math.min(
+        Math.floor(parseInput(contributionYearsInput, DEFAULTS.contributionYears).value),
+        MAX_YEARS
+      );
+      const contributionMonths = contributionYears * 12;
+      const { monthlyBalances } = simulate(monthly, rate, initial, 120, contributionMonths, severance, livingExpense);
+      drawChart(monthlyBalances);
+    });
+
+    recalculate();
+  </script>
+</body>
+</html>
