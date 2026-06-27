@@ -110,6 +110,39 @@
       outline: none;
     }
 
+    .field input[type="date"] {
+      color-scheme: light;
+    }
+
+    .birth-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .birth-row .input-wrap {
+      flex: 1;
+    }
+
+    .save-btn {
+      flex-shrink: 0;
+      padding: 9px 14px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.8125rem;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+
+    .save-btn:hover { background: #1d4ed8; }
+    .save-btn:active { background: #1e40af; }
+    .save-btn.saved { background: var(--interest); }
+
     .field .input-wrap:focus-within {
       border-color: var(--accent);
       background: var(--surface);
@@ -198,6 +231,28 @@
       font-weight: 500;
     }
 
+    .result-card.inactive {
+      opacity: 0.55;
+      border-style: dashed;
+    }
+
+    .result-card.positive {
+      border-color: var(--interest);
+      background: var(--interest-light);
+    }
+
+    .result-card.positive .period {
+      color: var(--interest);
+    }
+
+    .result-card .amount-muted {
+      font-size: 0.875rem;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
     .chart-wrap {
       position: relative;
       margin-bottom: 8px;
@@ -270,7 +325,7 @@
         <div class="field">
           <label for="monthly">월 저축액</label>
           <div class="input-wrap">
-            <input type="number" id="monthly" value="50" min="0" step="1">
+            <input type="number" id="monthly" value="50" min="0" step="10">
             <span class="unit">만원</span>
           </div>
         </div>
@@ -284,7 +339,7 @@
         <div class="field">
           <label for="initial">초기 자산</label>
           <div class="input-wrap">
-            <input type="number" id="initial" value="0" min="0" step="1">
+            <input type="number" id="initial" value="0" min="0" step="1000">
             <span class="unit">만원</span>
           </div>
           <p class="field-hint" id="initial-hint" aria-live="polite"></p>
@@ -299,7 +354,7 @@
         <div class="field">
           <label for="severance">퇴직금</label>
           <div class="input-wrap">
-            <input type="number" id="severance" value="0" min="0" step="1">
+            <input type="number" id="severance" value="0" min="0" step="1000">
             <span class="unit">만원</span>
           </div>
           <p class="field-hint" id="severance-hint" aria-live="polite"></p>
@@ -307,9 +362,19 @@
         <div class="field">
           <label for="livingExpense">퇴직 후 생활비</label>
           <div class="input-wrap">
-            <input type="number" id="livingExpense" value="0" min="0" step="1">
+            <input type="number" id="livingExpense" value="0" min="0" step="10">
             <span class="unit">만원</span>
           </div>
+        </div>
+        <div class="field">
+          <label for="birthDate">출생일</label>
+          <div class="birth-row">
+            <div class="input-wrap">
+              <input type="date" id="birthDate" min="1900-01-01">
+            </div>
+            <button id="saveDefaults" class="save-btn" title="현재 입력값을 기본값으로 저장">저장</button>
+          </div>
+          <p class="field-hint" id="birth-hint" aria-live="polite"></p>
         </div>
       </div>
       <p class="notice" id="notice"></p>
@@ -322,15 +387,16 @@
       <div class="chart-wrap">
         <canvas id="chart"></canvas>
       </div>
-      <p class="chart-caption">X축: 1년 단위 · Y축: 총자산 10억 이하 1억, 20억 이하 2억 … 단위 · 점선: 3·5·10년 시점</p>
+      <p class="chart-caption">X축: 1년 단위 · Y축: 총자산 규모별 억 단위 · 점선: <span style="color:#b45309">저축종료</span> · <span style="color:#2563eb">FIRE 달성</span> · <span style="color:#dc2626">자산소진</span> — 10년 이내 시점만 표시</p>
     </section>
 
     <section class="panel">
-      <div class="panel-title">연도별 상세</div>
+      <div class="panel-title">연도별 상세 (50년)</div>
       <table>
         <thead>
           <tr>
             <th>연차</th>
+            <th>나이</th>
             <th>연말 잔액</th>
             <th>누적 납입</th>
             <th>누적 저축액</th>
@@ -347,12 +413,8 @@
     const MANWON = 10000;
     const EOK = 100000000;
     const MAX_YEARS = 10;
-    const HORIZONS = [
-      { years: 3, months: 36, highlight: false },
-      { years: 5, months: 60, highlight: false },
-      { years: 10, months: 120, highlight: true },
-    ];
-    const REF_YEARS = [3, 5, 10];
+    const LONG_MONTHS = 600;
+    let lastRefPoints = [];
 
     const monthlyInput = document.getElementById('monthly');
     const rateInput = document.getElementById('rate');
@@ -362,11 +424,79 @@
     const severanceInput = document.getElementById('severance');
     const livingExpenseInput = document.getElementById('livingExpense');
     const severanceHintEl = document.getElementById('severance-hint');
+    const birthDateInput = document.getElementById('birthDate');
+    const birthHintEl = document.getElementById('birth-hint');
+    const saveDefaultsBtn = document.getElementById('saveDefaults');
     const noticeEl = document.getElementById('notice');
     const resultsEl = document.getElementById('results');
     const tableBody = document.getElementById('table-body');
     const canvas = document.getElementById('chart');
     const ctx = canvas.getContext('2d');
+
+    (() => {
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      birthDateInput.max = `${yyyy}-${mm}-${dd}`;
+    })();
+
+    function calcAgeAt(birthDate, offsetMonths) {
+      const base = new Date();
+      base.setMonth(base.getMonth() + Math.round(offsetMonths));
+      let age = base.getFullYear() - birthDate.getFullYear();
+      const dm = base.getMonth() - birthDate.getMonth();
+      if (dm < 0 || (dm === 0 && base.getDate() < birthDate.getDate())) age--;
+      return age;
+    }
+
+    function parseBirthDate() {
+      const raw = birthDateInput.value;
+      if (!raw) return null;
+      const d = new Date(raw);
+      return isNaN(d) ? null : d;
+    }
+
+    function updateBirthHint() {
+      const birth = parseBirthDate();
+      if (!birth) { birthHintEl.textContent = ''; return; }
+      birthHintEl.textContent = '현재 만 ' + calcAgeAt(birth, 0) + '세';
+    }
+
+    const STORAGE_KEY = 'fireSimDefaults';
+
+    function saveDefaults() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        monthly: monthlyInput.value,
+        rate: rateInput.value,
+        initial: initialInput.value,
+        contributionYears: contributionYearsInput.value,
+        severance: severanceInput.value,
+        livingExpense: livingExpenseInput.value,
+        birthDate: birthDateInput.value,
+      }));
+      saveDefaultsBtn.textContent = '저장됨 ✓';
+      saveDefaultsBtn.classList.add('saved');
+      setTimeout(() => {
+        saveDefaultsBtn.textContent = '저장';
+        saveDefaultsBtn.classList.remove('saved');
+      }, 1500);
+    }
+
+    function loadDefaults() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const d = JSON.parse(raw);
+        if (d.monthly !== undefined) monthlyInput.value = d.monthly;
+        if (d.rate !== undefined) rateInput.value = d.rate;
+        if (d.initial !== undefined) initialInput.value = d.initial;
+        if (d.contributionYears !== undefined) contributionYearsInput.value = d.contributionYears;
+        if (d.severance !== undefined) severanceInput.value = d.severance;
+        if (d.livingExpense !== undefined) livingExpenseInput.value = d.livingExpense;
+        if (d.birthDate !== undefined) birthDateInput.value = d.birthDate;
+      } catch (e) {}
+    }
 
     function parseInput(input, fallback) {
       const raw = input.value.trim();
@@ -432,6 +562,14 @@
       return Math.round(n).toLocaleString('ko-KR') + '원';
     }
 
+    function formatMonths(months) {
+      const y = Math.floor(months / 12);
+      const m = months % 12;
+      if (y === 0) return m + '개월';
+      if (m === 0) return y + '년';
+      return y + '년 ' + m + '개월';
+    }
+
     function simulate(monthly, annualRate, initial, totalMonths, contributionMonths, severance, livingExpense) {
       const monthlyRate = annualRate / 100 / 12;
       let balance = initial;
@@ -462,22 +600,104 @@
       return { balance, totalContributed, totalSavings, interest };
     }
 
-    function renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, notices) {
-      const { monthlyBalances } = simulate(monthly, rate, initial, 120, contributionMonths, severance, livingExpense);
+    function renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, longBalances, notices, birthDate) {
+      const ageAt = (offsetMonths) => {
+        if (!birthDate) return '';
+        return ' · 만 ' + calcAgeAt(birthDate, offsetMonths) + '세';
+      };
 
-      resultsEl.innerHTML = HORIZONS.map(({ years, months, highlight }) => {
-        const { balance, totalContributed, totalSavings, interest } = getSnapshot(monthlyBalances, months, monthly, initial, contributionMonths, severance);
-        return `
-          <div class="result-card${highlight ? ' highlight' : ''}">
-            <div class="period">${years}년 후</div>
-            <div class="amount">${formatWon(balance)}</div>
+      const cards = [];
+
+      // Card 1: 저축 종료 시
+      const { balance: endBalance, totalContributed: endContributed, totalSavings: endSavings, interest: endInterest } =
+        getSnapshot(longBalances, contributionMonths, monthly, initial, contributionMonths, severance);
+      const endLabel = contributionMonths > 0 ? formatMonths(contributionMonths) + ' 후' : '현재';
+      cards.push(`
+        <div class="result-card">
+          <div class="period">저축 종료 · ${endLabel}${ageAt(contributionMonths)}</div>
+          <div class="amount">${formatWon(endBalance)}</div>
+          <div class="meta">
+            누적 저축 ${formatWon(endSavings)}${severance > 0 ? ' · 퇴직금 ' + formatWon(severance) : ''}<br>
+            총 납입 ${formatWon(endContributed)} · 이자 수익 <span class="interest">+${formatWon(endInterest)}</span>
+          </div>
+        </div>
+      `);
+
+      // Card 2: FIRE 달성 (목표 10억)
+      const fireTarget = 10 * EOK;
+      let fireMonth = null;
+      for (let m = 0; m <= LONG_MONTHS; m++) {
+        if (longBalances[m] >= fireTarget) { fireMonth = m; break; }
+      }
+
+      if (fireMonth === 0) {
+        cards.push(`
+          <div class="result-card highlight">
+            <div class="period">FIRE 달성 · 목표 10억${ageAt(0)}</div>
+            <div class="amount">이미 달성!</div>
             <div class="meta">
-              총 납입 ${formatWon(totalContributed)} · 누적 저축 ${formatWon(totalSavings)}<br>
-              이자 수익 <span class="interest">+${formatWon(interest)}</span>
+              목표 자산 10억원<br>
+              현재 잔액 <span class="interest">${formatWon(longBalances[0])}</span>
             </div>
           </div>
-        `;
-      }).join('');
+        `);
+      } else if (fireMonth !== null) {
+        cards.push(`
+          <div class="result-card highlight">
+            <div class="period">FIRE 달성 · 목표 10억${ageAt(fireMonth)}</div>
+            <div class="amount">${formatMonths(fireMonth)} 후</div>
+            <div class="meta">
+              목표 자산 10억원<br>
+              달성 시 잔액 <span class="interest">${formatWon(longBalances[fireMonth])}</span>
+            </div>
+          </div>
+        `);
+      } else {
+        cards.push(`
+          <div class="result-card highlight">
+            <div class="period">FIRE 달성 · 목표 10억</div>
+            <div class="amount-muted">50년 내 달성 어려움</div>
+            <div class="meta">목표 자산 10억원<br>저축액·수익률을 높여보세요</div>
+          </div>
+        `);
+      }
+
+      // Card 3: 자산 소진
+      let depletionMonth = null;
+      if (livingExpense > 0) {
+        for (let m = contributionMonths + 1; m <= LONG_MONTHS; m++) {
+          if (longBalances[m] === 0) { depletionMonth = m; break; }
+        }
+      }
+
+      if (livingExpense === 0) {
+        cards.push(`
+          <div class="result-card inactive">
+            <div class="period">자산 소진</div>
+            <div class="amount-muted">생활비를 입력하면<br>소진 시점을 계산합니다</div>
+            <div class="meta"></div>
+          </div>
+        `);
+      } else if (depletionMonth === null) {
+        cards.push(`
+          <div class="result-card positive">
+            <div class="period">자산 소진</div>
+            <div class="amount">소진되지 않음</div>
+            <div class="meta">수익률이 생활비를 충당합니다</div>
+          </div>
+        `);
+      } else {
+        const depletionAfterRetirement = depletionMonth - contributionMonths;
+        cards.push(`
+          <div class="result-card">
+            <div class="period">자산 소진${ageAt(depletionMonth)}</div>
+            <div class="amount">퇴직 후 ${formatMonths(depletionAfterRetirement)}</div>
+            <div class="meta">저축 종료 ${formatMonths(contributionMonths)} 후 소진</div>
+          </div>
+        `);
+      }
+
+      resultsEl.innerHTML = cards.join('');
 
       if (notices.length > 0) {
         noticeEl.textContent = notices.join(' ');
@@ -486,17 +706,19 @@
         noticeEl.classList.remove('visible');
       }
 
-      return monthlyBalances;
+      return { fireMonth, depletionMonth };
     }
 
-    function renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances) {
+    function renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances, birthDate) {
       tableBody.innerHTML = '';
-      for (let year = 1; year <= 10; year++) {
+      for (let year = 1; year <= 50; year++) {
         const months = year * 12;
         const { balance, totalContributed, totalSavings, interest } = getSnapshot(monthlyBalances, months, monthly, initial, contributionMonths, severance);
+        const ageCell = birthDate ? `<td>만 ${calcAgeAt(birthDate, months)}세</td>` : '<td>—</td>';
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${year}년</td>
+          ${ageCell}
           <td>${formatWon(balance)}</td>
           <td>${formatWon(totalContributed)}</td>
           <td>${formatWon(totalSavings)}</td>
@@ -510,7 +732,7 @@
       return Math.max(1, Math.ceil(maxEok / 10));
     }
 
-    function drawChart(monthlyBalances) {
+    function drawChart(monthlyBalances, refPoints = []) {
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas.getBoundingClientRect();
       canvas.width = rect.width * dpr;
@@ -568,10 +790,11 @@
         ctx.fillText(y + '년', x, pad.top + plotH + 8);
       }
 
-      // Reference lines at 3, 5, 10 years
-      REF_YEARS.forEach((year) => {
-        const x = xScale(year);
-        ctx.strokeStyle = '#2563eb';
+      // Reference lines (event-based: 저축종료, FIRE, 소진)
+      refPoints.forEach(({ month, label, color }) => {
+        const yearPos = month / 12;
+        const x = xScale(yearPos);
+        ctx.strokeStyle = color;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
@@ -580,11 +803,11 @@
         ctx.stroke();
         ctx.setLineDash([]);
 
-        ctx.fillStyle = '#2563eb';
+        ctx.fillStyle = color;
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
-        ctx.fillText(year + '년', x, pad.top - 2);
+        ctx.fillText(label, x, pad.top - 2);
       });
 
       // Area fill
@@ -667,16 +890,39 @@
       const livingExpense = livingExpenseManwonParsed.value * MANWON;
       const contributionMonths = contributionYears * 12;
 
-      const monthlyBalances = renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, notices);
-      renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances);
-      drawChart(monthlyBalances);
+      const { monthlyBalances: longBalances } = simulate(monthly, rate, initial, LONG_MONTHS, contributionMonths, severance, livingExpense);
+      const shortBalances = longBalances.slice(0, 121);
+      const { fireMonth, depletionMonth } = renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, longBalances, notices, parseBirthDate());
+      renderTable(monthly, rate, initial, contributionMonths, severance, longBalances, parseBirthDate());
+
+      lastRefPoints = [];
+      if (contributionMonths > 0 && contributionMonths <= 120) {
+        lastRefPoints.push({ month: contributionMonths, label: '저축종료', color: '#b45309' });
+      }
+      if (fireMonth !== null && fireMonth > 0 && fireMonth <= 120) {
+        lastRefPoints.push({ month: fireMonth, label: 'FIRE', color: '#2563eb' });
+      }
+      if (depletionMonth !== null && depletionMonth <= 120) {
+        lastRefPoints.push({ month: depletionMonth, label: '소진', color: '#dc2626' });
+      }
+      drawChart(shortBalances, lastRefPoints);
       updateInitialHint();
       updateSeveranceHint();
+      updateBirthHint();
     }
 
     [monthlyInput, rateInput, initialInput, contributionYearsInput, severanceInput, livingExpenseInput].forEach((el) => {
-      el.addEventListener('input', recalculate);
+      el.addEventListener('input', () => {
+        if (/^0\d/.test(el.value)) el.value = String(Number(el.value));
+        recalculate();
+      });
     });
+
+    birthDateInput.addEventListener('input', recalculate);
+    saveDefaultsBtn.addEventListener('click', saveDefaults);
+
+    loadDefaults();
+    recalculate();
 
     window.addEventListener('resize', () => {
       const monthly = parseInput(monthlyInput, DEFAULTS.monthlyManwon).value * MANWON;
@@ -690,7 +936,7 @@
       );
       const contributionMonths = contributionYears * 12;
       const { monthlyBalances } = simulate(monthly, rate, initial, 120, contributionMonths, severance, livingExpense);
-      drawChart(monthlyBalances);
+      drawChart(monthlyBalances, lastRefPoints);
     });
 
     recalculate();
