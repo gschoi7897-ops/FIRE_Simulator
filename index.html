@@ -28,7 +28,7 @@
     }
 
     .container {
-      max-width: 880px;
+      max-width: 960px;
       margin: 0 auto;
       padding: 32px 20px 48px;
     }
@@ -56,6 +56,26 @@
       margin-bottom: 20px;
     }
 
+    .panel-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .panel-brand {
+      font-size: 0.875rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: var(--text);
+    }
+
+    .save-btn-compact {
+      padding: 6px 14px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
     .panel-title {
       font-size: 0.75rem;
       font-weight: 600;
@@ -67,8 +87,12 @@
 
     .inputs {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .inputs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 640px) {
@@ -77,6 +101,22 @@
 
     .field {
       min-width: 0;
+    }
+
+    .field-span-full {
+      grid-column: 1 / -1;
+    }
+
+    .field-head {
+      min-height: 52px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      margin-bottom: 6px;
+    }
+
+    .field-head label {
+      margin-bottom: 0;
     }
 
     .field label {
@@ -114,43 +154,19 @@
       color-scheme: light;
     }
 
-    .birth-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
+    /* 출생일 통합 입력 */
+    .birth-date-field .input-wrap {
+      width: 100%;
     }
 
-    .birth-row .input-wrap {
-      flex: 1;
+    .save-btn-block {
+      width: 100%;
+      padding-top: 9px;
+      padding-bottom: 9px;
     }
 
-    /* 출생일 분리 입력 */
-    .birth-date-inputs {
-      display: flex;
-      gap: 4px;
-      flex: 1;
-    }
-
-    .birth-date-inputs .input-wrap { flex: 1; }
-
-    /* 예상수명 */
-    .life-input-group {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-
-    .life-label {
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: var(--text-secondary);
-      white-space: nowrap;
-    }
-
-    .life-input-group .input-wrap {
-      width: 128px;
-      flex: none;
+    .field input::placeholder {
+      color: #9ca3af;
     }
 
     /* 저축년수 or 퇴직년월 헤더 */
@@ -158,7 +174,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 6px;
+      gap: 6px;
     }
 
     .contrib-header label { margin-bottom: 0; }
@@ -174,11 +190,10 @@
     }
 
     .toggle-btn {
-      flex: 1;
-      padding: 3px 11px;
+      padding: 3px 8px;
       border: none;
       border-radius: 18px;
-      font-size: 0.75rem;
+      font-size: 0.6875rem;
       font-weight: 500;
       font-family: inherit;
       background: transparent;
@@ -403,21 +418,28 @@
     </header>
 
     <section class="panel">
-      <div class="panel-title">입력</div>
+      <div class="panel-top">
+        <span class="panel-brand">FIRE-SIMULATOR</span>
+        <button id="saveDefaults" class="save-btn save-btn-compact" title="현재 입력값을 기본값으로 저장">저장</button>
+      </div>
       <div class="inputs">
         <div class="field">
-          <label for="monthly">월 저축액</label>
+          <div class="field-head">
+            <label for="monthly">월 저축액</label>
+          </div>
           <div class="input-wrap">
             <input type="number" id="monthly" value="50" min="0" step="10">
             <span class="unit">만원</span>
           </div>
         </div>
         <div class="field">
-          <div class="contrib-header">
-            <label>저축년수 or 퇴직년월</label>
-            <div class="contrib-toggle">
-              <button class="toggle-btn active" id="tab-years">저축년수</button>
-              <button class="toggle-btn" id="tab-date">퇴직년월</button>
+          <div class="field-head">
+            <div class="contrib-header">
+              <label>저축년수 or 퇴직년월</label>
+              <div class="contrib-toggle">
+                <button class="toggle-btn active" id="tab-years">저축년수</button>
+                <button class="toggle-btn" id="tab-date">퇴직년월</button>
+              </div>
             </div>
           </div>
           <div id="contrib-years-wrap">
@@ -439,19 +461,14 @@
           <p class="field-hint" id="contrib-hint" aria-live="polite"></p>
         </div>
         <div class="field">
-          <label for="initial">초기 자산</label>
+          <div class="field-head">
+            <label for="initial">초기 자산</label>
+          </div>
           <div class="input-wrap">
             <input type="number" id="initial" value="0" min="0" step="1000">
             <span class="unit">만원</span>
           </div>
           <p class="field-hint" id="initial-hint" aria-live="polite"></p>
-        </div>
-        <div class="field">
-          <label for="rate">연 수익률</label>
-          <div class="input-wrap">
-            <input type="number" id="rate" value="7" min="0" max="100" step="1">
-            <span class="unit">%</span>
-          </div>
         </div>
         <div class="field">
           <label for="severance">퇴직금</label>
@@ -462,10 +479,31 @@
           <p class="field-hint" id="severance-hint" aria-live="polite"></p>
         </div>
         <div class="field">
+          <label for="rate">연 수익률</label>
+          <div class="input-wrap">
+            <input type="number" id="rate" value="7" min="0" max="100" step="1">
+            <span class="unit">%</span>
+          </div>
+        </div>
+        <div class="field">
           <label for="livingExpense">퇴직 후 생활비</label>
           <div class="input-wrap">
             <input type="number" id="livingExpense" value="0" min="0" step="10">
             <span class="unit">만원</span>
+          </div>
+        </div>
+        <div class="field birth-date-field">
+          <label for="birthDate">출생일</label>
+          <div class="input-wrap">
+            <input type="text" id="birthDate" inputmode="numeric" placeholder="1990-01-15" maxlength="10" spellcheck="false" autocomplete="bday">
+          </div>
+          <p class="field-hint" id="birth-hint" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="lifeExpectancy">예상수명</label>
+          <div class="input-wrap">
+            <input type="number" id="lifeExpectancy" value="90" min="1" max="150" step="1">
+            <span class="unit">세</span>
           </div>
         </div>
         <div class="field">
@@ -474,34 +512,6 @@
             <input type="number" id="inflationRate" value="3" min="0" max="100" step="0.1">
             <span class="unit">%</span>
           </div>
-        </div>
-        <div class="field">
-          <label>출생일</label>
-          <div class="birth-row">
-            <div class="birth-date-inputs">
-              <div class="input-wrap">
-                <input type="number" id="birthYear" placeholder="년도" min="1900" max="2100" step="1">
-                <span class="unit">년</span>
-              </div>
-              <div class="input-wrap">
-                <input type="number" id="birthMonth" placeholder="월" min="1" max="12" step="1">
-                <span class="unit">월</span>
-              </div>
-              <div class="input-wrap">
-                <input type="number" id="birthDay" placeholder="일" min="1" max="31" step="1">
-                <span class="unit">일</span>
-              </div>
-            </div>
-            <div class="life-input-group">
-              <span class="life-label">예상수명</span>
-              <div class="input-wrap">
-                <input type="number" id="lifeExpectancy" value="90" min="1" max="150" step="1">
-                <span class="unit">세</span>
-              </div>
-            </div>
-            <button id="saveDefaults" class="save-btn" title="현재 입력값을 기본값으로 저장">저장</button>
-          </div>
-          <p class="field-hint" id="birth-hint" aria-live="polite"></p>
         </div>
       </div>
       <p class="notice" id="notice"></p>
@@ -536,7 +546,19 @@
   </div>
 
   <script>
-    const DEFAULTS = { monthlyManwon: 50, rate: 7, initialManwon: 0, contributionYears: 10, severanceManwon: 0, livingExpenseManwon: 0, inflationRate: 3, lifeExpectancy: 90, contribMode: 'years' };
+    const DEFAULTS = {
+      monthlyManwon: 50,
+      rate: 7,
+      initialManwon: 0,
+      contributionYears: 10,
+      severanceManwon: 0,
+      livingExpenseManwon: 0,
+      inflationRate: 3,
+      lifeExpectancy: 90,
+      birthDate: '',
+      retireMonth: 1,
+      contribMode: 'years',
+    };
     const MANWON = 10000;
     const EOK = 100000000;
     const MAX_YEARS = 20;
@@ -554,9 +576,7 @@
     const livingExpenseInput  = document.getElementById('livingExpense');
     const inflationRateInput  = document.getElementById('inflationRate');
     const severanceHintEl     = document.getElementById('severance-hint');
-    const birthYearInput      = document.getElementById('birthYear');
-    const birthMonthInput     = document.getElementById('birthMonth');
-    const birthDayInput       = document.getElementById('birthDay');
+    const birthDateInput      = document.getElementById('birthDate');
     const lifeExpectancyInput = document.getElementById('lifeExpectancy');
     const birthHintEl         = document.getElementById('birth-hint');
     const saveDefaultsBtn     = document.getElementById('saveDefaults');
@@ -577,10 +597,37 @@
     /* ── 초기화 ── */
     (() => {
       const thisYear = new Date().getFullYear();
-      birthYearInput.max = thisYear;
       retireYearInput.min = thisYear;
       retireYearInput.value = thisYear + 5;
     })();
+
+    function formatBirthDateDigits(digits) {
+      digits = digits.replace(/\D/g, '').slice(0, 8);
+      if (digits.length <= 4) return digits;
+      if (digits.length <= 6) return digits.slice(0, 4) + '-' + digits.slice(4);
+      return digits.slice(0, 4) + '-' + digits.slice(4, 6) + '-' + digits.slice(6, 8);
+    }
+
+    function handleBirthDateInput() {
+      const input = birthDateInput;
+      const start = input.selectionStart ?? input.value.length;
+      const digitsBefore = input.value.slice(0, start).replace(/\D/g, '').length;
+      const formatted = formatBirthDateDigits(input.value);
+      input.value = formatted;
+
+      let newPos = formatted.length;
+      if (digitsBefore < 8) {
+        let count = 0;
+        newPos = 0;
+        for (let i = 0; i < formatted.length; i++) {
+          if (/\d/.test(formatted[i])) count++;
+          newPos = i + 1;
+          if (count >= digitsBefore) break;
+        }
+      }
+      input.setSelectionRange(newPos, newPos);
+      recalculate();
+    }
 
     /* ── 나이 계산 ── */
     function calcAgeAt(birthDate, offsetMonths) {
@@ -593,12 +640,18 @@
     }
 
     function parseBirthDate() {
-      const year  = parseInt(birthYearInput.value, 10);
-      const month = parseInt(birthMonthInput.value, 10);
-      const day   = parseInt(birthDayInput.value, 10);
-      if (!year || !month || !day) return null;
+      const raw = birthDateInput.value.trim();
+      if (!raw) return null;
+      const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!m) return null;
+      const year = parseInt(m[1], 10);
+      const month = parseInt(m[2], 10);
+      const day = parseInt(m[3], 10);
+      const today = new Date();
+      if (year < 1900 || year > today.getFullYear()) return null;
       const d = new Date(year, month - 1, day);
-      if (isNaN(d.getTime()) || d.getMonth() !== month - 1) return null;
+      if (isNaN(d.getTime()) || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+      if (d > today) return null;
       return d;
     }
 
@@ -621,9 +674,16 @@
     }
 
     function updateBirthHint() {
+      const raw = birthDateInput.value.trim();
+      if (!raw) { birthHintEl.textContent = ''; return; }
       const birth = parseBirthDate();
-      if (!birth) { birthHintEl.textContent = ''; return; }
-      birthHintEl.textContent = '현재 만 ' + calcAgeAt(birth, 0) + '세';
+      if (birth) {
+        birthHintEl.textContent = '현재 만 ' + calcAgeAt(birth, 0) + '세';
+        return;
+      }
+      const digits = raw.replace(/\D/g, '');
+      if (digits.length < 8) birthHintEl.textContent = 'YYYY-MM-DD 형식 (숫자 8자리)';
+      else birthHintEl.textContent = '올바른 날짜를 입력하세요';
     }
 
     /* ── 토글 모드 ── */
@@ -664,7 +724,22 @@
     }
 
     /* ── 저장/불러오기 ── */
-    const STORAGE_KEY = 'fireSimDefaults';
+    const STORAGE_KEY = 'fireSimDefaults_v2';
+
+    function applyBuiltInDefaults() {
+      monthlyInput.value = DEFAULTS.monthlyManwon;
+      rateInput.value = DEFAULTS.rate;
+      initialInput.value = DEFAULTS.initialManwon;
+      contributionYearsInput.value = DEFAULTS.contributionYears;
+      severanceInput.value = DEFAULTS.severanceManwon;
+      livingExpenseInput.value = DEFAULTS.livingExpenseManwon;
+      inflationRateInput.value = DEFAULTS.inflationRate;
+      lifeExpectancyInput.value = DEFAULTS.lifeExpectancy;
+      birthDateInput.value = DEFAULTS.birthDate;
+      retireMonthInput.value = DEFAULTS.retireMonth;
+      retireYearInput.value = new Date().getFullYear() + 5;
+      setContribMode(DEFAULTS.contribMode);
+    }
 
     function saveDefaults() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -675,9 +750,7 @@
         severance: severanceInput.value,
         livingExpense: livingExpenseInput.value,
         inflationRate: inflationRateInput.value,
-        birthYear: birthYearInput.value,
-        birthMonth: birthMonthInput.value,
-        birthDay: birthDayInput.value,
+        birthDate: birthDateInput.value,
         lifeExpectancy: lifeExpectancyInput.value,
         contribMode,
         retireYear: retireYearInput.value,
@@ -693,7 +766,8 @@
 
     function loadDefaults() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        let raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) raw = localStorage.getItem('fireSimDefaults');
         if (!raw) return;
         const d = JSON.parse(raw);
         if (d.monthly !== undefined)        monthlyInput.value = d.monthly;
@@ -703,9 +777,14 @@
         if (d.severance !== undefined)      severanceInput.value = d.severance;
         if (d.livingExpense !== undefined)  livingExpenseInput.value = d.livingExpense;
         if (d.inflationRate !== undefined) inflationRateInput.value = d.inflationRate;
-        if (d.birthYear !== undefined)      birthYearInput.value = d.birthYear;
-        if (d.birthMonth !== undefined)     birthMonthInput.value = d.birthMonth;
-        if (d.birthDay !== undefined)       birthDayInput.value = d.birthDay;
+        if (d.birthDate !== undefined) {
+          birthDateInput.value = d.birthDate;
+        } else if (d.birthYear !== undefined && d.birthMonth !== undefined && d.birthDay !== undefined) {
+          const y = String(d.birthYear).padStart(4, '0');
+          const mo = String(d.birthMonth).padStart(2, '0');
+          const da = String(d.birthDay).padStart(2, '0');
+          birthDateInput.value = `${y}-${mo}-${da}`;
+        }
         if (d.lifeExpectancy !== undefined) lifeExpectancyInput.value = d.lifeExpectancy;
         if (d.retireYear !== undefined)  retireYearInput.value = d.retireYear;
         if (d.retireMonth !== undefined) retireMonthInput.value = d.retireMonth;
@@ -994,7 +1073,8 @@
     [monthlyInput, rateInput, initialInput, contributionYearsInput, severanceInput, livingExpenseInput, inflationRateInput, lifeExpectancyInput].forEach((el) => {
       el.addEventListener('input', () => { if (/^0\d/.test(el.value)) el.value = String(Number(el.value)); recalculate(); });
     });
-    [birthYearInput, birthMonthInput, birthDayInput, retireYearInput, retireMonthInput].forEach(el => el.addEventListener('input', recalculate));
+    birthDateInput.addEventListener('input', handleBirthDateInput);
+    [retireYearInput, retireMonthInput].forEach(el => el.addEventListener('input', recalculate));
     tabYearsBtn.addEventListener('click', () => { setContribMode('years'); recalculate(); });
     tabDateBtn.addEventListener('click',  () => { setContribMode('date');  recalculate(); });
     saveDefaultsBtn.addEventListener('click', saveDefaults);
@@ -1015,6 +1095,7 @@
       drawChart(monthlyBalances, lastRefPoints);
     });
 
+    applyBuiltInDefaults();
     loadDefaults();
     recalculate();
   </script>
