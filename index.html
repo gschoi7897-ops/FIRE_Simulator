@@ -399,7 +399,7 @@
   <div class="container">
     <header>
       <h1>저축 시뮬레이터</h1>
-      <p>매월 말 납입 · 저축 기간 이후 납입 중단 · 저축 종료 시 퇴직금 일시 반영 · 퇴직 후 매월 생활비 차감 · 월복리 가정 · 세금·인플레 미반영</p>
+      <p>매월 말 납입 · 저축 기간 이후 납입 중단 · 저축 종료 시 퇴직금 일시 반영 · 퇴직 후 생활비 매년 물가상승률 반영 · 월복리 가정 · 세금 미반영</p>
     </header>
 
     <section class="panel">
@@ -469,6 +469,13 @@
           </div>
         </div>
         <div class="field">
+          <label for="inflationRate">물가상승률</label>
+          <div class="input-wrap">
+            <input type="number" id="inflationRate" value="3" min="0" max="100" step="0.1">
+            <span class="unit">%</span>
+          </div>
+        </div>
+        <div class="field">
           <label>출생일</label>
           <div class="birth-row">
             <div class="birth-date-inputs">
@@ -511,7 +518,7 @@
     </section>
 
     <section class="panel">
-      <div class="panel-title" id="table-panel-title">연도별 상세 (50년)</div>
+      <div class="panel-title" id="table-panel-title">연도별 상세</div>
       <table>
         <thead>
           <tr>
@@ -529,11 +536,11 @@
   </div>
 
   <script>
-    const DEFAULTS = { monthlyManwon: 50, rate: 7, initialManwon: 0, contributionYears: 10, severanceManwon: 0, livingExpenseManwon: 0, lifeExpectancy: 90, contribMode: 'years' };
+    const DEFAULTS = { monthlyManwon: 50, rate: 7, initialManwon: 0, contributionYears: 10, severanceManwon: 0, livingExpenseManwon: 0, inflationRate: 3, lifeExpectancy: 90, contribMode: 'years' };
     const MANWON = 10000;
     const EOK = 100000000;
     const MAX_YEARS = 20;
-    const LONG_MONTHS = 600;
+    const DEFAULT_SIM_YEARS = 50;
     const CHART_YEARS = 20;
     let lastRefPoints = [];
     let contribMode = 'years';
@@ -545,6 +552,7 @@
     const contributionYearsInput = document.getElementById('contributionYears');
     const severanceInput      = document.getElementById('severance');
     const livingExpenseInput  = document.getElementById('livingExpense');
+    const inflationRateInput  = document.getElementById('inflationRate');
     const severanceHintEl     = document.getElementById('severance-hint');
     const birthYearInput      = document.getElementById('birthYear');
     const birthMonthInput     = document.getElementById('birthMonth');
@@ -592,6 +600,24 @@
       const d = new Date(year, month - 1, day);
       if (isNaN(d.getTime()) || d.getMonth() !== month - 1) return null;
       return d;
+    }
+
+    function calcSimYears(birthDate, lifeExpectancy) {
+      if (birthDate && lifeExpectancy > 0) {
+        const remaining = lifeExpectancy - calcAgeAt(birthDate, 0);
+        if (remaining > 0) return remaining;
+      }
+      if (lifeExpectancy > 0) return lifeExpectancy;
+      return DEFAULT_SIM_YEARS;
+    }
+
+    function calcSimMonths(birthDate, lifeExpectancy) {
+      return calcSimYears(birthDate, lifeExpectancy) * 12;
+    }
+
+    function calcRetirementLivingExpense(baseExpense, inflationRate, retirementMonth) {
+      const yearIndex = Math.floor((retirementMonth - 1) / 12);
+      return baseExpense * Math.pow(1 + inflationRate / 100, yearIndex);
     }
 
     function updateBirthHint() {
@@ -648,6 +674,7 @@
         contributionYears: contributionYearsInput.value,
         severance: severanceInput.value,
         livingExpense: livingExpenseInput.value,
+        inflationRate: inflationRateInput.value,
         birthYear: birthYearInput.value,
         birthMonth: birthMonthInput.value,
         birthDay: birthDayInput.value,
@@ -675,6 +702,7 @@
         if (d.contributionYears !== undefined) contributionYearsInput.value = d.contributionYears;
         if (d.severance !== undefined)      severanceInput.value = d.severance;
         if (d.livingExpense !== undefined)  livingExpenseInput.value = d.livingExpense;
+        if (d.inflationRate !== undefined) inflationRateInput.value = d.inflationRate;
         if (d.birthYear !== undefined)      birthYearInput.value = d.birthYear;
         if (d.birthMonth !== undefined)     birthMonthInput.value = d.birthMonth;
         if (d.birthDay !== undefined)       birthDayInput.value = d.birthDay;
@@ -731,7 +759,7 @@
     }
 
     /* ── 시뮬레이션 ── */
-    function simulate(monthly, annualRate, initial, totalMonths, contributionMonths, severance, livingExpense) {
+    function simulate(monthly, annualRate, initial, totalMonths, contributionMonths, severance, livingExpense, inflationRate) {
       const monthlyRate = annualRate / 100 / 12;
       let balance = initial;
       const monthlyBalances = [initial];
@@ -740,7 +768,12 @@
         balance = balance * (1 + monthlyRate);
         if (contributionMonths > 0 && m <= contributionMonths) balance += monthly;
         if (contributionMonths > 0 && m === contributionMonths && severance > 0) balance += severance;
-        if (m > contributionMonths && livingExpense > 0) { balance -= livingExpense; if (balance < 0) balance = 0; }
+        if (m > contributionMonths && livingExpense > 0) {
+          const retirementMonth = m - contributionMonths;
+          const currentExpense = calcRetirementLivingExpense(livingExpense, inflationRate, retirementMonth);
+          balance -= currentExpense;
+          if (balance < 0) balance = 0;
+        }
         monthlyBalances.push(balance);
       }
       return { balance, monthlyBalances };
@@ -756,9 +789,10 @@
     }
 
     /* ── 결과 카드 ── */
-    function renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, longBalances, notices, birthDate) {
+    function renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, longBalances, notices, birthDate, simYears) {
       const ageAt = (mo) => birthDate ? ' · 만 ' + calcAgeAt(birthDate, mo) + '세' : '';
       const cards = [];
+      const simMonths = longBalances.length - 1;
 
       const { balance: endBalance, totalContributed: endContributed, totalSavings: endSavings, interest: endInterest } =
         getSnapshot(longBalances, contributionMonths, monthly, initial, contributionMonths, severance);
@@ -774,25 +808,25 @@
 
       const fireTarget = 10 * EOK;
       let fireMonth = null;
-      for (let m = 0; m <= LONG_MONTHS; m++) { if (longBalances[m] >= fireTarget) { fireMonth = m; break; } }
+      for (let m = 0; m <= simMonths; m++) { if (longBalances[m] >= fireTarget) { fireMonth = m; break; } }
 
       if (fireMonth === 0) {
         cards.push(`<div class="result-card highlight"><div class="period">FIRE 달성 · 목표 10억${ageAt(0)}</div><div class="amount">이미 달성!</div><div class="meta">목표 자산 10억원<br>현재 잔액 <span class="interest">${formatWon(longBalances[0])}</span></div></div>`);
       } else if (fireMonth !== null) {
         cards.push(`<div class="result-card highlight"><div class="period">FIRE 달성 · 목표 10억${ageAt(fireMonth)}</div><div class="amount">${formatMonths(fireMonth)} 후</div><div class="meta">목표 자산 10억원<br>달성 시 잔액 <span class="interest">${formatWon(longBalances[fireMonth])}</span></div></div>`);
       } else {
-        cards.push(`<div class="result-card highlight"><div class="period">FIRE 달성 · 목표 10억</div><div class="amount-muted">50년 내 달성 어려움</div><div class="meta">목표 자산 10억원<br>저축액·수익률을 높여보세요</div></div>`);
+        cards.push(`<div class="result-card highlight"><div class="period">FIRE 달성 · 목표 10억</div><div class="amount-muted">${simYears}년 내 달성 어려움</div><div class="meta">목표 자산 10억원<br>저축액·수익률을 높여보세요</div></div>`);
       }
 
       let depletionMonth = null;
       if (livingExpense > 0) {
-        for (let m = contributionMonths + 1; m <= LONG_MONTHS; m++) { if (longBalances[m] === 0) { depletionMonth = m; break; } }
+        for (let m = contributionMonths + 1; m <= simMonths; m++) { if (longBalances[m] === 0) { depletionMonth = m; break; } }
       }
 
       if (livingExpense === 0) {
         cards.push(`<div class="result-card inactive"><div class="period">자산 소진</div><div class="amount-muted">생활비를 입력하면<br>소진 시점을 계산합니다</div><div class="meta"></div></div>`);
       } else if (depletionMonth === null) {
-        cards.push(`<div class="result-card positive"><div class="period">자산 소진</div><div class="amount">소진되지 않음</div><div class="meta">수익률이 생활비를 충당합니다</div></div>`);
+        cards.push(`<div class="result-card positive"><div class="period">자산 소진</div><div class="amount">소진되지 않음</div><div class="meta">수익률이 생활비(물가상승 반영)를 충당합니다</div></div>`);
       } else {
         cards.push(`<div class="result-card"><div class="period">자산 소진${ageAt(depletionMonth)}</div><div class="amount">퇴직 후 ${formatMonths(depletionMonth - contributionMonths)}</div><div class="meta">저축 종료 ${formatMonths(contributionMonths)} 후 소진</div></div>`);
       }
@@ -806,13 +840,13 @@
     /* ── 연도별 테이블 ── */
     function renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances, birthDate, lifeExpectancy) {
       tableBody.innerHTML = '';
-      let maxYears = 50;
+      const maxYears = calcSimYears(birthDate, lifeExpectancy);
       if (birthDate && lifeExpectancy > 0) {
-        const remaining = lifeExpectancy - calcAgeAt(birthDate, 0);
-        if (remaining > 0) maxYears = Math.min(remaining, 80);
         tablePanelTitleEl.textContent = `연도별 상세 (만 ${lifeExpectancy}세까지 · ${maxYears}년)`;
+      } else if (lifeExpectancy > 0) {
+        tablePanelTitleEl.textContent = `연도별 상세 (${lifeExpectancy}년)`;
       } else {
-        tablePanelTitleEl.textContent = '연도별 상세 (50년)';
+        tablePanelTitleEl.textContent = `연도별 상세 (${DEFAULT_SIM_YEARS}년)`;
       }
       const available = monthlyBalances.length - 1;
       for (let year = 1; year <= maxYears; year++) {
@@ -902,12 +936,14 @@
       const initialManwonParsed      = parseInput(initialInput,        DEFAULTS.initialManwon);
       const severanceManwonParsed    = parseInput(severanceInput,      DEFAULTS.severanceManwon);
       const livingExpenseManwonParsed= parseInput(livingExpenseInput,  DEFAULTS.livingExpenseManwon);
+      const inflationRateParsed      = parseInput(inflationRateInput,  DEFAULTS.inflationRate);
 
       if (monthlyManwonParsed.corrected)       { monthlyInput.value = monthlyManwonParsed.value;             notices.push('월 저축액을 기본값으로 조정했습니다.'); }
       if (rateParsed.corrected)                { rateInput.value = rateParsed.value;                          notices.push('연 수익률을 기본값으로 조정했습니다.'); }
       if (initialManwonParsed.corrected)       { initialInput.value = initialManwonParsed.value;              notices.push('초기 자산을 기본값으로 조정했습니다.'); }
       if (severanceManwonParsed.corrected)     { severanceInput.value = severanceManwonParsed.value;          notices.push('퇴직금을 기본값으로 조정했습니다.'); }
       if (livingExpenseManwonParsed.corrected) { livingExpenseInput.value = livingExpenseManwonParsed.value;  notices.push('퇴직 후 생활비를 기본값으로 조정했습니다.'); }
+      if (inflationRateParsed.corrected)       { inflationRateInput.value = inflationRateParsed.value;        notices.push('물가상승률을 기본값으로 조정했습니다.'); }
 
       let contributionMonths;
       if (contribMode === 'date') {
@@ -927,14 +963,17 @@
       const initial       = initialManwonParsed.value * MANWON;
       const severance     = severanceManwonParsed.value * MANWON;
       const livingExpense = livingExpenseManwonParsed.value * MANWON;
+      const inflationRate = inflationRateParsed.value;
       const lifeExpectancy= Math.max(0, Math.floor(Number(lifeExpectancyInput.value) || DEFAULTS.lifeExpectancy));
       const birthDate     = parseBirthDate();
+      const simYears      = calcSimYears(birthDate, lifeExpectancy);
+      const simMonths     = simYears * 12;
 
-      const { monthlyBalances: longBalances } = simulate(monthly, rate, initial, LONG_MONTHS, contributionMonths, severance, livingExpense);
+      const { monthlyBalances: longBalances } = simulate(monthly, rate, initial, simMonths, contributionMonths, severance, livingExpense, inflationRate);
       const chartMonths = CHART_YEARS * 12;
-      const shortBalances = longBalances.slice(0, chartMonths + 1);
+      const shortBalances = longBalances.slice(0, Math.min(chartMonths, simMonths) + 1);
 
-      const { fireMonth, depletionMonth } = renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, longBalances, notices, birthDate);
+      const { fireMonth, depletionMonth } = renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, longBalances, notices, birthDate, simYears);
       renderTable(monthly, rate, initial, contributionMonths, severance, longBalances, birthDate, lifeExpectancy);
 
       lastRefPoints = [];
@@ -952,7 +991,7 @@
     }
 
     /* ── 이벤트 ── */
-    [monthlyInput, rateInput, initialInput, contributionYearsInput, severanceInput, livingExpenseInput, lifeExpectancyInput].forEach((el) => {
+    [monthlyInput, rateInput, initialInput, contributionYearsInput, severanceInput, livingExpenseInput, inflationRateInput, lifeExpectancyInput].forEach((el) => {
       el.addEventListener('input', () => { if (/^0\d/.test(el.value)) el.value = String(Number(el.value)); recalculate(); });
     });
     [birthYearInput, birthMonthInput, birthDayInput, retireYearInput, retireMonthInput].forEach(el => el.addEventListener('input', recalculate));
@@ -966,9 +1005,13 @@
       const initial       = parseInput(initialInput,       DEFAULTS.initialManwon).value * MANWON;
       const severance     = parseInput(severanceInput,     DEFAULTS.severanceManwon).value * MANWON;
       const livingExpense = parseInput(livingExpenseInput, DEFAULTS.livingExpenseManwon).value * MANWON;
+      const inflationRate = parseInput(inflationRateInput, DEFAULTS.inflationRate).value;
+      const lifeExpectancy = Math.max(0, Math.floor(Number(lifeExpectancyInput.value) || DEFAULTS.lifeExpectancy));
+      const birthDate = parseBirthDate();
       const cm = contribMode === 'date' ? calcContribMonthsFromDate()
         : Math.min(Math.floor(parseInput(contributionYearsInput, DEFAULTS.contributionYears).value), MAX_YEARS) * 12;
-      const { monthlyBalances } = simulate(monthly, rate, initial, CHART_YEARS * 12, cm, severance, livingExpense);
+      const chartMonths = Math.min(CHART_YEARS * 12, calcSimMonths(birthDate, lifeExpectancy));
+      const { monthlyBalances } = simulate(monthly, rate, initial, chartMonths, cm, severance, livingExpense, inflationRate);
       drawChart(monthlyBalances, lastRefPoints);
     });
 
