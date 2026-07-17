@@ -240,6 +240,10 @@
     .save-btn:hover { background: #1d4ed8; }
     .save-btn:active { background: #1e40af; }
     .save-btn.saved { background: var(--interest); }
+    .share-btn { background: #6366f1; }
+    .share-btn:hover { background: #4f46e5; }
+    .share-btn:active { background: #4338ca; }
+    .share-btn.copied { background: var(--interest); }
 
     .field .input-wrap:focus-within {
       border-color: var(--accent);
@@ -420,7 +424,10 @@
     <section class="panel">
       <div class="panel-top">
         <span class="panel-brand">FIRE-SIMULATOR</span>
-        <button id="saveDefaults" class="save-btn save-btn-compact" title="현재 입력값을 기본값으로 저장">저장</button>
+        <div style="display:flex;gap:6px">
+          <button id="shareBtn" class="save-btn save-btn-compact share-btn" title="현재 설정을 URL로 공유">공유</button>
+          <button id="saveDefaults" class="save-btn save-btn-compact" title="현재 입력값을 기본값으로 저장">저장</button>
+        </div>
       </div>
       <div class="inputs">
         <div class="field">
@@ -580,6 +587,7 @@
     const lifeExpectancyInput = document.getElementById('lifeExpectancy');
     const birthHintEl         = document.getElementById('birth-hint');
     const saveDefaultsBtn     = document.getElementById('saveDefaults');
+    const shareBtnEl          = document.getElementById('shareBtn');
     const noticeEl            = document.getElementById('notice');
     const resultsEl           = document.getElementById('results');
     const tableBody           = document.getElementById('table-body');
@@ -722,6 +730,70 @@
       if (months === 0) { contribHintEl.textContent = '이미 지난 날짜입니다'; return; }
       contribHintEl.textContent = '→ ' + formatMonths(months) + ' 후 (' + months + '개월)';
     }
+
+    /* ── URL 공유 ── */
+    function buildShareURL() {
+      const params = new URLSearchParams();
+      params.set('m',    monthlyInput.value);
+      params.set('r',    rateInput.value);
+      params.set('i',    initialInput.value);
+      params.set('sv',   severanceInput.value);
+      params.set('ex',   livingExpenseInput.value);
+      params.set('ir',   inflationRateInput.value);
+      params.set('bd',   birthDateInput.value);
+      params.set('lx',   lifeExpectancyInput.value);
+      params.set('mode', contribMode);
+      if (contribMode === 'years') {
+        params.set('cy', contributionYearsInput.value);
+      } else {
+        params.set('ry', retireYearInput.value);
+        params.set('rm', retireMonthInput.value);
+      }
+      return location.origin + location.pathname + '?' + params.toString();
+    }
+
+    function loadFromURL() {
+      const params = new URLSearchParams(location.search);
+      if (!params.has('m') && !params.has('r')) return;
+      if (params.has('m'))  monthlyInput.value = params.get('m');
+      if (params.has('r'))  rateInput.value = params.get('r');
+      if (params.has('i'))  initialInput.value = params.get('i');
+      if (params.has('sv')) severanceInput.value = params.get('sv');
+      if (params.has('ex')) livingExpenseInput.value = params.get('ex');
+      if (params.has('ir')) inflationRateInput.value = params.get('ir');
+      if (params.has('bd')) birthDateInput.value = params.get('bd');
+      if (params.has('lx')) lifeExpectancyInput.value = params.get('lx');
+      const mode = params.get('mode') || 'years';
+      if (mode === 'date') {
+        setContribMode('date');
+        if (params.has('ry')) retireYearInput.value = params.get('ry');
+        if (params.has('rm')) retireMonthInput.value = params.get('rm');
+      } else {
+        setContribMode('years');
+        if (params.has('cy')) contributionYearsInput.value = params.get('cy');
+      }
+    }
+
+    shareBtnEl.addEventListener('click', () => {
+      const url = buildShareURL();
+      const finish = (ok) => {
+        shareBtnEl.textContent = ok ? '복사됨 ✓' : 'URL 복사 실패';
+        shareBtnEl.classList.add('copied');
+        setTimeout(() => {
+          shareBtnEl.textContent = '공유';
+          shareBtnEl.classList.remove('copied');
+        }, 1800);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => finish(true)).catch(() => {
+          prompt('아래 URL을 복사하세요:', url);
+          finish(true);
+        });
+      } else {
+        prompt('아래 URL을 복사하세요:', url);
+        finish(true);
+      }
+    });
 
     /* ── 저장/불러오기 ── */
     const STORAGE_KEY = 'fireSimDefaults_v2';
@@ -1116,6 +1188,7 @@
 
     applyBuiltInDefaults();
     loadDefaults();
+    loadFromURL();
     recalculate();
   </script>
 </body>
