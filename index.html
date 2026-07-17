@@ -503,6 +503,22 @@
             <span class="unit">만원</span>
           </div>
         </div>
+        <div class="field">
+          <label for="pensionMonthly">국민연금 월 수령액</label>
+          <div class="input-wrap">
+            <input type="number" id="pensionMonthly" value="0" min="0" step="1">
+            <span class="unit">만원</span>
+          </div>
+          <p class="field-hint" id="pension-monthly-hint" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="pensionAge">연금 수령 시작 나이</label>
+          <div class="input-wrap">
+            <input type="number" id="pensionAge" value="65" min="1" max="100" step="1">
+            <span class="unit">세</span>
+          </div>
+          <p class="field-hint" id="pension-age-hint" aria-live="polite"></p>
+        </div>
         <div class="field birth-date-field">
           <label for="birthDate">출생일</label>
           <div class="input-wrap">
@@ -555,7 +571,7 @@
             <th>연말 잔액</th>
             <th>누적 납입</th>
             <th>누적 저축액</th>
-            <th>연간 생활비</th>
+            <th id="expense-col-header">연간 생활비</th>
             <th>누적 이자</th>
           </tr>
         </thead>
@@ -577,6 +593,8 @@
       birthDate: '',
       retireMonth: 1,
       contribMode: 'years',
+      pensionMonthlyManwon: 0,
+      pensionAge: 65,
     };
     const MANWON = 10000;
     const EOK = 100000000;
@@ -606,6 +624,10 @@
     const birthHintEl         = document.getElementById('birth-hint');
     const saveDefaultsBtn     = document.getElementById('saveDefaults');
     const shareBtnEl          = document.getElementById('shareBtn');
+    const pensionMonthlyInput = document.getElementById('pensionMonthly');
+    const pensionAgeInput     = document.getElementById('pensionAge');
+    const pensionMonthlyHintEl= document.getElementById('pension-monthly-hint');
+    const pensionAgeHintEl    = document.getElementById('pension-age-hint');
     const noticeEl            = document.getElementById('notice');
     const resultsEl           = document.getElementById('results');
     const tableBody           = document.getElementById('table-body');
@@ -679,6 +701,38 @@
       if (isNaN(d.getTime()) || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
       if (d > today) return null;
       return d;
+    }
+
+    /* ── 국민연금 시작 시점 계산 ── */
+    function calcPensionStartMonth(birthDate, pensionAge) {
+      if (!birthDate || pensionAge <= 0) return null;
+      const today = new Date();
+      const start = new Date(birthDate);
+      start.setFullYear(start.getFullYear() + pensionAge);
+      if (start <= today) return 0; // 이미 수령 중
+      return (start.getFullYear() - today.getFullYear()) * 12
+           + (start.getMonth() - today.getMonth());
+    }
+
+    function updatePensionHints() {
+      const pm = Number(pensionMonthlyInput.value) || 0;
+      pensionMonthlyHintEl.textContent = pm > 0 ? '→ 연 ' + formatReadableManwon(pm * 12) : '';
+
+      const age = Math.floor(Number(pensionAgeInput.value) || 0);
+      const birth = parseBirthDate();
+      if (!birth) {
+        pensionAgeHintEl.textContent = pm > 0 ? '출생일을 입력하면 시작 시점을 확인할 수 있습니다' : '';
+        return;
+      }
+      if (age <= 0) { pensionAgeHintEl.textContent = ''; return; }
+      const startMonth = calcPensionStartMonth(birth, age);
+      if (startMonth === 0) {
+        pensionAgeHintEl.textContent = '이미 수령 중';
+      } else if (startMonth !== null) {
+        const startDate = new Date(birth);
+        startDate.setFullYear(startDate.getFullYear() + age);
+        pensionAgeHintEl.textContent = '→ ' + startDate.getFullYear() + '년 ' + (startDate.getMonth() + 1) + '월부터 (' + formatMonths(startMonth) + ' 후)';
+      }
     }
 
     function calcSimYears(birthDate, lifeExpectancy) {
@@ -767,6 +821,8 @@
         params.set('ry', retireYearInput.value);
         params.set('rm', retireMonthInput.value);
       }
+      params.set('pm', pensionMonthlyInput.value);
+      params.set('pa', pensionAgeInput.value);
       return location.origin + location.pathname + '?' + params.toString();
     }
 
@@ -781,6 +837,8 @@
       if (params.has('ir')) inflationRateInput.value = params.get('ir');
       if (params.has('bd')) birthDateInput.value = params.get('bd');
       if (params.has('lx')) lifeExpectancyInput.value = params.get('lx');
+      if (params.has('pm')) pensionMonthlyInput.value = params.get('pm');
+      if (params.has('pa')) pensionAgeInput.value = params.get('pa');
       const mode = params.get('mode') || 'years';
       if (mode === 'date') {
         setContribMode('date');
@@ -828,6 +886,8 @@
       birthDateInput.value = DEFAULTS.birthDate;
       retireMonthInput.value = DEFAULTS.retireMonth;
       retireYearInput.value = new Date().getFullYear() + 5;
+      pensionMonthlyInput.value = DEFAULTS.pensionMonthlyManwon;
+      pensionAgeInput.value = DEFAULTS.pensionAge;
       setContribMode(DEFAULTS.contribMode);
     }
 
@@ -845,6 +905,8 @@
         contribMode,
         retireYear: retireYearInput.value,
         retireMonth: retireMonthInput.value,
+        pensionMonthly: pensionMonthlyInput.value,
+        pensionAge: pensionAgeInput.value,
       }));
       saveDefaultsBtn.textContent = '저장됨 ✓';
       saveDefaultsBtn.classList.add('saved');
@@ -878,6 +940,8 @@
         if (d.lifeExpectancy !== undefined) lifeExpectancyInput.value = d.lifeExpectancy;
         if (d.retireYear !== undefined)  retireYearInput.value = d.retireYear;
         if (d.retireMonth !== undefined) retireMonthInput.value = d.retireMonth;
+        if (d.pensionMonthly !== undefined) pensionMonthlyInput.value = d.pensionMonthly;
+        if (d.pensionAge !== undefined)     pensionAgeInput.value = d.pensionAge;
         if (d.contribMode) setContribMode(d.contribMode);
       } catch (e) {}
     }
@@ -928,7 +992,7 @@
     }
 
     /* ── 시뮬레이션 ── */
-    function simulate(monthly, annualRate, initial, totalMonths, contributionMonths, severance, livingExpense, inflationRate) {
+    function simulate(monthly, annualRate, initial, totalMonths, contributionMonths, severance, livingExpense, inflationRate, pensionMonthly, pensionStartMonth) {
       const monthlyRate = annualRate / 100 / 12;
       let balance = initial;
       const monthlyBalances = [initial];
@@ -939,8 +1003,10 @@
         if (contributionMonths > 0 && m === contributionMonths && severance > 0) balance += severance;
         if (m > contributionMonths && livingExpense > 0) {
           const retirementMonth = m - contributionMonths;
-          const currentExpense = calcRetirementLivingExpense(livingExpense, inflationRate, retirementMonth);
-          balance -= currentExpense;
+          const grossExpense = calcRetirementLivingExpense(livingExpense, inflationRate, retirementMonth);
+          const pension = (pensionMonthly > 0 && pensionStartMonth !== null && m >= pensionStartMonth) ? pensionMonthly : 0;
+          const netExpense = Math.max(0, grossExpense - pension);
+          balance -= netExpense;
           if (balance < 0) balance = 0;
         }
         monthlyBalances.push(balance);
@@ -1007,19 +1073,21 @@
     }
 
     /* ── 연도별 테이블 ── */
-    function calcYearlyLivingExpense(year, contributionMonths, livingExpense, inflationRate) {
+    function calcYearlyLivingExpense(year, contributionMonths, livingExpense, inflationRate, pensionMonthly, pensionStartMonth) {
+      if (year * 12 <= contributionMonths) return null;
       if (livingExpense <= 0) return null;
-      let total = 0, hasExpense = false;
+      let total = 0;
       for (let m = (year - 1) * 12 + 1; m <= year * 12; m++) {
         if (m > contributionMonths) {
-          total += calcRetirementLivingExpense(livingExpense, inflationRate, m - contributionMonths);
-          hasExpense = true;
+          const gross = calcRetirementLivingExpense(livingExpense, inflationRate, m - contributionMonths);
+          const pension = (pensionMonthly > 0 && pensionStartMonth !== null && m >= pensionStartMonth) ? pensionMonthly : 0;
+          total += Math.max(0, gross - pension);
         }
       }
-      return hasExpense ? total : null;
+      return total;
     }
 
-    function renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances, birthDate, lifeExpectancy, livingExpense, inflationRate) {
+    function renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances, birthDate, lifeExpectancy, livingExpense, inflationRate, pensionMonthly, pensionStartMonth) {
       tableBody.innerHTML = '';
       const maxYears = calcSimYears(birthDate, lifeExpectancy);
       if (birthDate && lifeExpectancy > 0) {
@@ -1029,13 +1097,17 @@
       } else {
         tablePanelTitleEl.textContent = `연도별 상세 (${DEFAULT_SIM_YEARS}년)`;
       }
+      const expenseColHeader = document.getElementById('expense-col-header');
+      if (expenseColHeader) {
+        expenseColHeader.textContent = (pensionMonthly > 0 && pensionStartMonth !== null) ? '연간 생활비(연금↓)' : '연간 생활비';
+      }
       const available = monthlyBalances.length - 1;
       for (let year = 1; year <= maxYears; year++) {
         const months = year * 12;
         if (months > available) break;
         const { balance, totalContributed, totalSavings, interest } = getSnapshot(monthlyBalances, months, monthly, initial, contributionMonths, severance);
         const ageCell = birthDate ? `<td>만 ${calcAgeAt(birthDate, months)}세</td>` : '<td>—</td>';
-        const yearlyExpense = calcYearlyLivingExpense(year, contributionMonths, livingExpense, inflationRate);
+        const yearlyExpense = calcYearlyLivingExpense(year, contributionMonths, livingExpense, inflationRate, pensionMonthly, pensionStartMonth);
         const expenseCell = yearlyExpense !== null
           ? `<td class="expense-cell">-${formatWon(yearlyExpense)}</td>`
           : '<td>—</td>';
@@ -1219,8 +1291,11 @@
       const birthDate     = parseBirthDate();
       const simYears      = calcSimYears(birthDate, lifeExpectancy);
       const simMonths     = simYears * 12;
+      const pensionMonthly    = Math.max(0, Number(pensionMonthlyInput.value) || 0) * MANWON;
+      const pensionAge        = Math.max(0, Math.floor(Number(pensionAgeInput.value) || DEFAULTS.pensionAge));
+      const pensionStartMonth = calcPensionStartMonth(birthDate, pensionAge);
 
-      const { monthlyBalances: longBalances } = simulate(monthly, rate, initial, simMonths, contributionMonths, severance, livingExpense, inflationRate);
+      const { monthlyBalances: longBalances } = simulate(monthly, rate, initial, simMonths, contributionMonths, severance, livingExpense, inflationRate, pensionMonthly, pensionStartMonth);
 
       lastLongBalances     = longBalances;
       lastSimYears         = simYears;
@@ -1231,7 +1306,7 @@
       const shortBalances = longBalances.slice(0, Math.min(chartMonths, simMonths) + 1);
 
       const { fireMonth, depletionMonth } = renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, longBalances, notices, birthDate, simYears);
-      renderTable(monthly, rate, initial, contributionMonths, severance, longBalances, birthDate, lifeExpectancy, livingExpense, inflationRate);
+      renderTable(monthly, rate, initial, contributionMonths, severance, longBalances, birthDate, lifeExpectancy, livingExpense, inflationRate, pensionMonthly, pensionStartMonth);
 
       lastFireMonth      = fireMonth;
       lastDepletionMonth = depletionMonth;
@@ -1249,10 +1324,11 @@
       updateInitialHint();
       updateSeveranceHint();
       updateBirthHint();
+      updatePensionHints();
     }
 
     /* ── 이벤트 ── */
-    [monthlyInput, rateInput, initialInput, contributionYearsInput, severanceInput, livingExpenseInput, inflationRateInput, lifeExpectancyInput].forEach((el) => {
+    [monthlyInput, rateInput, initialInput, contributionYearsInput, severanceInput, livingExpenseInput, inflationRateInput, lifeExpectancyInput, pensionMonthlyInput, pensionAgeInput].forEach((el) => {
       el.addEventListener('input', () => { if (/^0\d/.test(el.value)) el.value = String(Number(el.value)); recalculate(); });
     });
     birthDateInput.addEventListener('input', handleBirthDateInput);
