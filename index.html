@@ -527,11 +527,18 @@
     <div class="results" id="results"></div>
 
     <section class="panel">
-      <div class="panel-title">자산 성장 그래프 (20년)</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="panel-title" style="margin-bottom:0" id="chart-panel-title">자산 성장 그래프 (20년)</div>
+        <div class="contrib-toggle">
+          <button class="toggle-btn active" id="chart-tab-20">20년</button>
+          <button class="toggle-btn" id="chart-tab-40">40년</button>
+          <button class="toggle-btn" id="chart-tab-life">수명까지</button>
+        </div>
+      </div>
       <div class="chart-wrap">
         <canvas id="chart"></canvas>
       </div>
-      <p class="chart-caption">X축: 1년 단위 · Y축: 총자산 규모별 억 단위 · 점선: <span style="color:#b45309">저축종료</span> · <span style="color:#2563eb">FIRE 달성</span> · <span style="color:#dc2626">자산소진</span> — 20년 이내 시점만 표시</p>
+      <p class="chart-caption" id="chart-caption">X축: 1년 단위 · Y축: 총자산 규모별 억 단위 · 점선: <span style="color:#b45309">저축종료</span> · <span style="color:#2563eb">FIRE 달성</span> · <span style="color:#dc2626">자산소진</span></p>
     </section>
 
     <section class="panel">
@@ -573,6 +580,12 @@
     const CHART_YEARS = 20;
     let lastRefPoints = [];
     let contribMode = 'years';
+    let chartViewMode = '20';
+    let lastLongBalances = [];
+    let lastSimYears = DEFAULT_SIM_YEARS;
+    let lastContributionMonths = 0;
+    let lastFireMonth = null;
+    let lastDepletionMonth = null;
 
     const monthlyInput        = document.getElementById('monthly');
     const rateInput           = document.getElementById('rate');
@@ -1024,7 +1037,7 @@
       const W = rect.width, H = rect.height;
       const LABEL_LINE_H = 14;
       const MIN_X_GAP = 36;
-      const totalYears = CHART_YEARS;
+      const totalYears = Math.floor((monthlyBalances.length - 1) / 12);
 
       // 가까운 라벨은 세로로 엇갈려 표시하기 위해 레벨 할당
       const sorted = [...refPoints].sort((a, b) => a.month - b.month);
@@ -1068,8 +1081,9 @@
 
       ctx.fillStyle = '#5c6370'; ctx.font = '11px sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      const xLabelStep = totalYears > 50 ? 10 : totalYears > 25 ? 5 : totalYears > 10 ? 2 : 1;
       for (let y = 0; y <= totalYears; y++) {
-        if (totalYears > 10 && y % 2 !== 0) continue;
+        if (y % xLabelStep !== 0) continue;
         ctx.fillText(y + '년', xScale(y), pad.top + plotH + 8);
       }
 
@@ -1096,6 +1110,52 @@
       const lx = xScale(totalYears), ly = yScale(data[totalYears]);
       ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2);
       ctx.fillStyle = '#2563eb'; ctx.fill();
+    }
+
+    /* ── 차트 범위 토글 ── */
+    const chartTab20   = document.getElementById('chart-tab-20');
+    const chartTab40   = document.getElementById('chart-tab-40');
+    const chartTabLife = document.getElementById('chart-tab-life');
+    const chartPanelTitle = document.getElementById('chart-panel-title');
+    const chartCaption    = document.getElementById('chart-caption');
+
+    function getChartYears(simYears) {
+      if (chartViewMode === '40')   return Math.min(40, simYears);
+      if (chartViewMode === 'life') return simYears;
+      return Math.min(20, simYears);
+    }
+
+    function updateChartLabel(chartYears) {
+      const label = chartViewMode === 'life' ? '수명까지 (' + chartYears + '년)' : chartYears + '년';
+      chartPanelTitle.textContent = '자산 성장 그래프 (' + label + ')';
+      const note = chartViewMode === 'life'
+        ? '해당 기간 이내 시점만 표시'
+        : chartYears + '년 이내 시점만 표시';
+      chartCaption.innerHTML = 'X축: 1년 단위 · Y축: 총자산 규모별 억 단위 · 점선: <span style="color:#b45309">저축종료</span> · <span style="color:#2563eb">FIRE 달성</span> · <span style="color:#dc2626">자산소진</span> — ' + note;
+    }
+
+    function redrawChartForMode() {
+      const chartYears  = getChartYears(lastSimYears);
+      const chartMonths = chartYears * 12;
+      const short = lastLongBalances.slice(0, Math.min(chartMonths, lastLongBalances.length - 1) + 1);
+      const pts = [];
+      if (lastContributionMonths > 0 && lastContributionMonths <= chartMonths)
+        pts.push({ month: lastContributionMonths, label: '저축종료', color: '#b45309' });
+      if (lastFireMonth !== null && lastFireMonth > 0 && lastFireMonth <= chartMonths)
+        pts.push({ month: lastFireMonth, label: 'FIRE', color: '#2563eb' });
+      if (lastDepletionMonth !== null && lastDepletionMonth <= chartMonths)
+        pts.push({ month: lastDepletionMonth, label: '소진', color: '#dc2626' });
+      lastRefPoints = pts;
+      updateChartLabel(chartYears);
+      drawChart(short, pts);
+    }
+
+    function setChartViewMode(mode) {
+      chartViewMode = mode;
+      chartTab20.classList.toggle('active',   mode === '20');
+      chartTab40.classList.toggle('active',   mode === '40');
+      chartTabLife.classList.toggle('active', mode === 'life');
+      redrawChartForMode();
     }
 
     /* ── 재계산 ── */
@@ -1140,11 +1200,20 @@
       const simMonths     = simYears * 12;
 
       const { monthlyBalances: longBalances } = simulate(monthly, rate, initial, simMonths, contributionMonths, severance, livingExpense, inflationRate);
-      const chartMonths = CHART_YEARS * 12;
+
+      lastLongBalances     = longBalances;
+      lastSimYears         = simYears;
+      lastContributionMonths = contributionMonths;
+
+      const chartYears  = getChartYears(simYears);
+      const chartMonths = chartYears * 12;
       const shortBalances = longBalances.slice(0, Math.min(chartMonths, simMonths) + 1);
 
       const { fireMonth, depletionMonth } = renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, longBalances, notices, birthDate, simYears);
       renderTable(monthly, rate, initial, contributionMonths, severance, longBalances, birthDate, lifeExpectancy);
+
+      lastFireMonth      = fireMonth;
+      lastDepletionMonth = depletionMonth;
 
       lastRefPoints = [];
       if (contributionMonths > 0 && contributionMonths <= chartMonths)
@@ -1154,6 +1223,7 @@
       if (depletionMonth !== null && depletionMonth <= chartMonths)
         lastRefPoints.push({ month: depletionMonth, label: '소진', color: '#dc2626' });
 
+      updateChartLabel(chartYears);
       drawChart(shortBalances, lastRefPoints);
       updateInitialHint();
       updateSeveranceHint();
@@ -1169,21 +1239,12 @@
     tabYearsBtn.addEventListener('click', () => { setContribMode('years'); recalculate(); });
     tabDateBtn.addEventListener('click',  () => { setContribMode('date');  recalculate(); });
     saveDefaultsBtn.addEventListener('click', saveDefaults);
+    chartTab20.addEventListener('click',   () => setChartViewMode('20'));
+    chartTab40.addEventListener('click',   () => setChartViewMode('40'));
+    chartTabLife.addEventListener('click', () => setChartViewMode('life'));
 
     window.addEventListener('resize', () => {
-      const monthly       = parseInput(monthlyInput,      DEFAULTS.monthlyManwon).value * MANWON;
-      const rate          = parseInput(rateInput,          DEFAULTS.rate).value;
-      const initial       = parseInput(initialInput,       DEFAULTS.initialManwon).value * MANWON;
-      const severance     = parseInput(severanceInput,     DEFAULTS.severanceManwon).value * MANWON;
-      const livingExpense = parseInput(livingExpenseInput, DEFAULTS.livingExpenseManwon).value * MANWON;
-      const inflationRate = parseInput(inflationRateInput, DEFAULTS.inflationRate).value;
-      const lifeExpectancy = Math.max(0, Math.floor(Number(lifeExpectancyInput.value) || DEFAULTS.lifeExpectancy));
-      const birthDate = parseBirthDate();
-      const cm = contribMode === 'date' ? calcContribMonthsFromDate()
-        : Math.min(Math.floor(parseInput(contributionYearsInput, DEFAULTS.contributionYears).value), MAX_YEARS) * 12;
-      const chartMonths = Math.min(CHART_YEARS * 12, calcSimMonths(birthDate, lifeExpectancy));
-      const { monthlyBalances } = simulate(monthly, rate, initial, chartMonths, cm, severance, livingExpense, inflationRate);
-      drawChart(monthlyBalances, lastRefPoints);
+      redrawChartForMode();
     });
 
     applyBuiltInDefaults();
