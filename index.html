@@ -950,10 +950,28 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       const W = rect.width, H = rect.height;
-      const pad = { top: 16, right: 16, bottom: 36, left: 52 };
+      const LABEL_LINE_H = 14;
+      const MIN_X_GAP = 36;
+      const totalYears = CHART_YEARS;
+
+      // 가까운 라벨은 세로로 엇갈려 표시하기 위해 레벨 할당
+      const sorted = [...refPoints].sort((a, b) => a.month - b.month);
+      const placed = [];
+      const levels = [];
+      sorted.forEach(pt => {
+        const xFrac = pt.month / (totalYears * 12);
+        let level = 0;
+        for (const p of placed) {
+          if (Math.abs(p.xFrac - xFrac) * W < MIN_X_GAP && p.level >= level) level = p.level + 1;
+        }
+        placed.push({ xFrac, level });
+        levels.push(level);
+      });
+      const maxLevel = levels.length > 0 ? Math.max(...levels) : 0;
+
+      const pad = { top: 16 + maxLevel * LABEL_LINE_H, right: 16, bottom: 36, left: 52 };
       const plotW = W - pad.left - pad.right;
       const plotH = H - pad.top - pad.bottom;
-      const totalYears = CHART_YEARS;
 
       const data = [];
       for (let y = 0; y <= totalYears; y++) data.push(monthlyBalances[y * 12] ?? 0);
@@ -983,14 +1001,15 @@
         ctx.fillText(y + '년', xScale(y), pad.top + plotH + 8);
       }
 
-      refPoints.forEach(({ month, label, color }) => {
+      sorted.forEach(({ month, label, color }, i) => {
         const x = xScale(month / 12);
         ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
         ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + plotH); ctx.stroke();
         ctx.setLineDash([]);
+        const labelY = pad.top - 2 - levels[i] * LABEL_LINE_H;
         ctx.fillStyle = color; ctx.font = '10px sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-        ctx.fillText(label, x, pad.top - 2);
+        ctx.fillText(label, x, labelY);
       });
 
       ctx.beginPath(); ctx.moveTo(xScale(0), yScale(data[0]));
