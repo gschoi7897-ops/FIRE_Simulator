@@ -412,6 +412,10 @@
     tbody td.interest-cell {
       color: var(--interest);
     }
+
+    tbody td.expense-cell {
+      color: #b45309;
+    }
   </style>
 </head>
 <body>
@@ -551,6 +555,7 @@
             <th>연말 잔액</th>
             <th>누적 납입</th>
             <th>누적 저축액</th>
+            <th>연간 생활비</th>
             <th>누적 이자</th>
           </tr>
         </thead>
@@ -1002,7 +1007,19 @@
     }
 
     /* ── 연도별 테이블 ── */
-    function renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances, birthDate, lifeExpectancy) {
+    function calcYearlyLivingExpense(year, contributionMonths, livingExpense, inflationRate) {
+      if (livingExpense <= 0) return null;
+      let total = 0, hasExpense = false;
+      for (let m = (year - 1) * 12 + 1; m <= year * 12; m++) {
+        if (m > contributionMonths) {
+          total += calcRetirementLivingExpense(livingExpense, inflationRate, m - contributionMonths);
+          hasExpense = true;
+        }
+      }
+      return hasExpense ? total : null;
+    }
+
+    function renderTable(monthly, rate, initial, contributionMonths, severance, monthlyBalances, birthDate, lifeExpectancy, livingExpense, inflationRate) {
       tableBody.innerHTML = '';
       const maxYears = calcSimYears(birthDate, lifeExpectancy);
       if (birthDate && lifeExpectancy > 0) {
@@ -1018,8 +1035,12 @@
         if (months > available) break;
         const { balance, totalContributed, totalSavings, interest } = getSnapshot(monthlyBalances, months, monthly, initial, contributionMonths, severance);
         const ageCell = birthDate ? `<td>만 ${calcAgeAt(birthDate, months)}세</td>` : '<td>—</td>';
+        const yearlyExpense = calcYearlyLivingExpense(year, contributionMonths, livingExpense, inflationRate);
+        const expenseCell = yearlyExpense !== null
+          ? `<td class="expense-cell">-${formatWon(yearlyExpense)}</td>`
+          : '<td>—</td>';
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${year}년</td>${ageCell}<td>${formatWon(balance)}</td><td>${formatWon(totalContributed)}</td><td>${formatWon(totalSavings)}</td><td class="interest-cell">+${formatWon(interest)}</td>`;
+        tr.innerHTML = `<td>${year}년</td>${ageCell}<td>${formatWon(balance)}</td><td>${formatWon(totalContributed)}</td><td>${formatWon(totalSavings)}</td>${expenseCell}<td class="interest-cell">+${formatWon(interest)}</td>`;
         tableBody.appendChild(tr);
       }
     }
@@ -1210,7 +1231,7 @@
       const shortBalances = longBalances.slice(0, Math.min(chartMonths, simMonths) + 1);
 
       const { fireMonth, depletionMonth } = renderResults(monthly, rate, initial, contributionMonths, severance, livingExpense, longBalances, notices, birthDate, simYears);
-      renderTable(monthly, rate, initial, contributionMonths, severance, longBalances, birthDate, lifeExpectancy);
+      renderTable(monthly, rate, initial, contributionMonths, severance, longBalances, birthDate, lifeExpectancy, livingExpense, inflationRate);
 
       lastFireMonth      = fireMonth;
       lastDepletionMonth = depletionMonth;
