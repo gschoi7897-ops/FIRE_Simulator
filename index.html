@@ -496,6 +496,27 @@
             <span class="unit">%</span>
           </div>
         </div>
+      </div>
+      <p class="notice" id="notice"></p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-title">소비성향</div>
+      <div class="inputs">
+        <div class="field birth-date-field">
+          <label for="birthDate">출생일</label>
+          <div class="input-wrap">
+            <input type="text" id="birthDate" inputmode="numeric" placeholder="1990-01-15" maxlength="10" spellcheck="false" autocomplete="bday">
+          </div>
+          <p class="field-hint" id="birth-hint" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="lifeExpectancy">예상수명</label>
+          <div class="input-wrap">
+            <input type="number" id="lifeExpectancy" value="90" min="1" max="150" step="1">
+            <span class="unit">세</span>
+          </div>
+        </div>
         <div class="field">
           <label for="livingExpense">퇴직 후 생활비</label>
           <div class="input-wrap">
@@ -503,6 +524,21 @@
             <span class="unit">만원</span>
           </div>
         </div>
+        <div class="field">
+          <label for="inflationRate">물가상승률</label>
+          <div class="input-wrap">
+            <input type="number" id="inflationRate" value="3" min="0" max="100" step="0.1">
+            <span class="unit">%</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="results" id="results"></div>
+
+    <section class="panel">
+      <div class="panel-title">국민연금</div>
+      <div class="inputs">
         <div class="field">
           <label for="pensionMonthly">국민연금 월 수령액 (세후)</label>
           <div class="input-wrap">
@@ -519,32 +555,8 @@
           </div>
           <p class="field-hint" id="pension-age-hint" aria-live="polite"></p>
         </div>
-        <div class="field birth-date-field">
-          <label for="birthDate">출생일</label>
-          <div class="input-wrap">
-            <input type="text" id="birthDate" inputmode="numeric" placeholder="1990-01-15" maxlength="10" spellcheck="false" autocomplete="bday">
-          </div>
-          <p class="field-hint" id="birth-hint" aria-live="polite"></p>
-        </div>
-        <div class="field">
-          <label for="lifeExpectancy">예상수명</label>
-          <div class="input-wrap">
-            <input type="number" id="lifeExpectancy" value="90" min="1" max="150" step="1">
-            <span class="unit">세</span>
-          </div>
-        </div>
-        <div class="field">
-          <label for="inflationRate">물가상승률</label>
-          <div class="input-wrap">
-            <input type="number" id="inflationRate" value="3" min="0" max="100" step="0.1">
-            <span class="unit">%</span>
-          </div>
-        </div>
       </div>
-      <p class="notice" id="notice"></p>
     </section>
-
-    <div class="results" id="results"></div>
 
     <section class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
