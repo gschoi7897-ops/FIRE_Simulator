@@ -421,17 +421,21 @@
 <body>
   <div class="container">
     <header>
-      <h1>저축 시뮬레이터</h1>
-      <p>매월 말 납입 · 저축 기간 이후 납입 중단 · 저축 종료 시 퇴직금 일시 반영 · 퇴직 후 생활비 매년 물가상승률 반영 · 월복리 가정 · 세금 미반영</p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+        <div>
+          <h1>저축 시뮬레이터</h1>
+          <p>매월 말 납입 · 저축 기간 이후 납입 중단 · 저축 종료 시 퇴직금 일시 반영 · 퇴직 후 생활비 매년 물가상승률 반영 · 월복리 가정 · 세금 미반영</p>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;padding-top:4px">
+          <button id="shareBtn" class="save-btn save-btn-compact share-btn" title="현재 설정을 URL로 공유">공유</button>
+          <button id="saveDefaults" class="save-btn save-btn-compact" title="현재 입력값을 기본값으로 저장">저장</button>
+        </div>
+      </div>
     </header>
 
     <section class="panel">
       <div class="panel-top">
-        <span class="panel-brand">FIRE-SIMULATOR</span>
-        <div style="display:flex;gap:6px">
-          <button id="shareBtn" class="save-btn save-btn-compact share-btn" title="현재 설정을 URL로 공유">공유</button>
-          <button id="saveDefaults" class="save-btn save-btn-compact" title="현재 입력값을 기본값으로 저장">저장</button>
-        </div>
+        <span class="panel-brand">MAIN</span>
       </div>
       <div class="inputs">
         <div class="field">
@@ -534,8 +538,6 @@
       </div>
     </section>
 
-    <div class="results" id="results"></div>
-
     <section class="panel">
       <div class="panel-title">국민연금</div>
       <div class="inputs">
@@ -557,6 +559,8 @@
         </div>
       </div>
     </section>
+
+    <div class="results" id="results"></div>
 
     <section class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
